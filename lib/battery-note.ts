@@ -19,6 +19,12 @@ export type GeneratedBatteryNote = {
   content: string;
   tags: string[];
   imageKeywords: string[];
+  subtitle?: string;
+};
+
+type GeneratedSection = {
+  heading: string;
+  body: string;
 };
 
 export function safeStringArray(input: unknown) {
@@ -38,9 +44,76 @@ export function normalizeTags(tags: string[]) {
     .slice(0, 4);
 }
 
+function keywordToImageTags(keyword: string) {
+  const normalized = (keyword || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9가-힣\s-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const englishTokens = normalized
+    .split(" ")
+    .filter((token) => /^[a-z0-9-]{2,}$/.test(token))
+    .slice(0, 4);
+
+  const koreanHints: string[] = [];
+  if (/배터리|밧데리/.test(normalized)) {
+    koreanHints.push("battery");
+  }
+  if (/자동차|차량|승용차|수입차|국산차/.test(normalized)) {
+    koreanHints.push("car");
+  }
+  if (/정비|수리|점검|교체/.test(normalized)) {
+    koreanHints.push("mechanic");
+  }
+  if (/엔진|시동/.test(normalized)) {
+    koreanHints.push("engine");
+  }
+  if (/겨울|한파/.test(normalized)) {
+    koreanHints.push("winter");
+  }
+
+  const merged = Array.from(
+    new Set([...englishTokens, ...koreanHints, "car", "battery"]),
+  ).slice(0, 4);
+
+  return merged.length > 0 ? merged : ["car", "battery"];
+}
+
 export function buildUnsplashSourceUrl(keyword: string, sig: number) {
-  const encoded = encodeURIComponent(keyword.trim() || "car battery");
-  return `https://source.unsplash.com/1600x900/?${encoded}&sig=${sig}`;
+  const tags = keywordToImageTags(keyword);
+  const encodedTagPath = tags.map((tag) => encodeURIComponent(tag)).join(",");
+  const lock = Number.isFinite(sig) ? Math.max(1, Math.floor(sig)) : 1;
+  return `https://loremflickr.com/1600/900/${encodedTagPath}?lock=${lock}`;
+}
+
+export function normalizeNoteImageUrl(
+  input: string | null | undefined,
+  sig: number,
+  fallbackKeyword = "car battery",
+) {
+  if (!input || typeof input !== "string") {
+    return buildUnsplashSourceUrl(fallbackKeyword, sig);
+  }
+
+  const trimmed = input.trim();
+  if (!trimmed) {
+    return buildUnsplashSourceUrl(fallbackKeyword, sig);
+  }
+
+  // 과거 source.unsplash URL은 현재 응답 실패가 빈번해서 새 공급원으로 치환.
+  if (trimmed.includes("source.unsplash.com")) {
+    try {
+      const parsed = new URL(trimmed);
+      const keys = [...parsed.searchParams.keys()].filter((key) => key !== "sig");
+      const derivedKeyword = keys[0] ? decodeURIComponent(keys[0]) : fallbackKeyword;
+      return buildUnsplashSourceUrl(derivedKeyword, sig);
+    } catch {
+      return buildUnsplashSourceUrl(fallbackKeyword, sig);
+    }
+  }
+
+  return trimmed;
 }
 
 export function toSlug(input: string) {
@@ -83,15 +156,54 @@ export function sanitizeGeneratedNote(raw: Record<string, unknown>): GeneratedBa
       : "배터리 상태 점검과 교체 주기는 차량 운행 안정성에 직접적인 영향을 줍니다.";
   const tags = normalizeTags(safeStringArray(raw.tags));
   const imageKeywords = safeStringArray(raw.imageKeywords);
+  const subtitle =
+    typeof raw.subtitle === "string" && raw.subtitle.trim().length > 0
+      ? raw.subtitle.trim()
+      : "";
+
+  const rawSections = Array.isArray(raw.sections) ? raw.sections : [];
+  const sections: GeneratedSection[] = rawSections
+    .map((item) => {
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+      const record = item as Record<string, unknown>;
+      const heading =
+        typeof record.heading === "string" && record.heading.trim().length > 0
+          ? record.heading.trim()
+          : "";
+      const body =
+        typeof record.body === "string" && record.body.trim().length > 0
+          ? record.body.trim()
+          : "";
+      if (!heading || !body) {
+        return null;
+      }
+      return { heading, body };
+    })
+    .filter((item): item is GeneratedSection => Boolean(item))
+    .slice(0, 8);
+
+  const sectionContent =
+    sections.length > 0
+      ? sections
+          .map((section) => `## ${section.heading}\n\n${section.body}`)
+          .join("\n\n")
+      : content;
+
+  const composedContent = subtitle
+    ? `부제: ${subtitle}\n\n${sectionContent}`
+    : sectionContent;
 
   return {
     title,
     excerpt,
-    content,
+    content: composedContent,
     tags: tags.length > 0 ? tags : ["#배터리관리", "#자동차점검"],
     imageKeywords:
       imageKeywords.length >= 3
         ? imageKeywords.slice(0, 3)
         : ["car battery", "auto repair shop", "car maintenance"],
+    subtitle: subtitle || undefined,
   };
 }

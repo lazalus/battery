@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { safeStringArray, type BatteryNoteDetail } from "@/lib/battery-note";
+import {
+  normalizeNoteImageUrl,
+  safeStringArray,
+  type BatteryNoteDetail,
+} from "@/lib/battery-note";
 import { ensureBatteryNoteSchema } from "@/lib/ensure-battery-note-schema";
 
 type RouteContext = {
@@ -40,8 +44,10 @@ export async function GET(_request: Request, { params }: RouteContext) {
       title: post.title,
       excerpt: post.excerpt,
       content: post.content,
-      thumbnailUrl: post.thumbnailUrl,
-      bodyImageUrls: safeStringArray(post.bodyImageUrls),
+      thumbnailUrl: normalizeNoteImageUrl(post.thumbnailUrl, 1, post.title),
+      bodyImageUrls: safeStringArray(post.bodyImageUrls).map((url, index) =>
+        normalizeNoteImageUrl(url, index + 2, `${post.title} ${index + 1}`),
+      ),
       tags: safeStringArray(post.tags),
       publishedAt: post.publishedAt.toISOString(),
     };

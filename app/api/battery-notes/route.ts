@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { safeStringArray, type BatteryNotePreview } from "@/lib/battery-note";
+import {
+  normalizeNoteImageUrl,
+  safeStringArray,
+  type BatteryNotePreview,
+} from "@/lib/battery-note";
 import { ensureBatteryNoteSchema } from "@/lib/ensure-battery-note-schema";
 
 export async function GET(request: Request) {
@@ -33,7 +37,7 @@ export async function GET(request: Request) {
       slug: post.slug,
       title: post.title,
       excerpt: post.excerpt,
-      thumbnailUrl: post.thumbnailUrl,
+      thumbnailUrl: normalizeNoteImageUrl(post.thumbnailUrl, 1, post.title),
       tags: safeStringArray(post.tags),
       publishedAt: post.publishedAt.toISOString(),
     }));

@@ -84,11 +84,15 @@ function buildPrompt(existingTitles: string[]) {
 
 요구사항:
 - 주제: 배터리 관리법, 교체 방법, 차량용 배터리 기술 소개 중 하나.
-- 한국어, 자연스러운 문장.
-- 본문은 약 1500자(최소 1300자, 최대 1800자).
-- 본문은 6~10개 단락으로 작성하고 단락 구분은 "\\n\\n" 사용.
+- 한국어, 현장 에디터가 작성한 듯한 담백한 문체.
+- 본문 총량은 약 1500자(최소 1300자, 최대 1800자).
+- 제목, 부제, 소제목-본문 구조를 반드시 사용.
+- 소제목은 4~6개, 각 소제목 본문은 2~4문장.
 - 기존 글 제목과 중복 또는 유사 제목 금지.
 - 사실 확인 가능한 일반 상식 수준으로만 작성하고 과장 금지.
+- 아래 표현은 사용 금지:
+  "지금 확인해보세요", "완벽 가이드", "혁신", "필수입니다", "꼭 해야 합니다"
+- 광고성 문장/과도한 감탄문 금지.
 
 기존 제목 목록:
 ${titleBlock}
@@ -96,9 +100,12 @@ ${titleBlock}
 JSON 스키마:
 {
   "title": "문자열",
-  "excerpt": "80~140자 요약",
+  "subtitle": "40~90자 부제",
+  "excerpt": "80~140자 요약(목록용)",
   "tags": ["#태그1", "#태그2", "#태그3"],
-  "content": "단락형 본문",
+  "sections": [
+    { "heading": "소제목", "body": "소제목 본문(2~4문장)" }
+  ],
   "imageKeywords": ["썸네일용 영문 키워드", "본문이미지1 영문 키워드", "본문이미지2 영문 키워드"]
 }
 
@@ -124,8 +131,8 @@ async function requestGemini(prompt: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        generationConfig: {
-          temperature: 0.8,
+      generationConfig: {
+          temperature: 0.65,
           topP: 0.9,
         },
         contents: [
