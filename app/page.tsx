@@ -1571,10 +1571,10 @@ export default function Home() {
         )}
 
         {activeTab === "map" && (
-          <section className="space-y-4">
-            <article className="rounded-xl border border-line bg-surface p-4 shadow-sm sm:rounded-2xl sm:p-5">
+          <section className="space-y-3 sm:space-y-4">
+            <article className="rounded-xl border border-line bg-surface p-3 shadow-sm sm:rounded-2xl sm:p-5">
               <h2 className="text-lg font-bold">배터리 가게 지도 검색</h2>
-              <div className="mt-4">
+              <div className="mt-3">
                 <input
                   value={mapKeyword}
                   onChange={(event) => setMapKeyword(event.target.value)}
@@ -1585,11 +1585,11 @@ export default function Home() {
                   지역명 위주로 입력해 위치를 먼저 맞추고, 지도를 옮기면 현재 지도 중심 기준으로 매장을 표시합니다.
                 </p>
               </div>
-              <div className="mt-3 inline-flex overflow-hidden rounded-lg border border-line bg-white">
+              <div className="mt-3 flex w-full overflow-hidden rounded-lg border border-line bg-white sm:inline-flex sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setMapStoreSortMode("relevance")}
-                  className={`px-2.5 py-1.5 text-[11px] font-semibold ${
+                  className={`flex-1 px-2.5 py-2 text-[12px] font-semibold sm:flex-none sm:text-[11px] ${
                     mapStoreSortMode === "relevance"
                       ? "bg-brand text-white"
                       : "text-slate-600"
@@ -1600,7 +1600,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => setMapStoreSortMode("distance")}
-                  className={`px-2.5 py-1.5 text-[11px] font-semibold ${
+                  className={`flex-1 px-2.5 py-2 text-[12px] font-semibold sm:flex-none sm:text-[11px] ${
                     mapStoreSortMode === "distance"
                       ? "bg-brand text-white"
                       : "text-slate-600"
@@ -1611,7 +1611,7 @@ export default function Home() {
               </div>
             </article>
 
-            <article className="rounded-xl border border-line bg-surface p-4 shadow-sm sm:rounded-2xl sm:p-5">
+            <article className="rounded-xl border border-line bg-surface p-3 shadow-sm sm:rounded-2xl sm:p-5">
               <KakaoStoreSearchSection
                 keyword={mapKeyword}
                 nearbyOnly
@@ -1622,7 +1622,7 @@ export default function Home() {
               />
             </article>
 
-            <article className="rounded-xl border border-line bg-surface p-4 shadow-sm sm:rounded-2xl sm:p-5">
+            <article className="rounded-xl border border-line bg-surface p-3 shadow-sm sm:rounded-2xl sm:p-5">
               <h3 className="text-base font-bold">
                 검색 결과 매장 ({realMapResults.length})
               </h3>
@@ -2180,21 +2180,21 @@ export default function Home() {
         )}
       </main>
 
-      <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-line bg-white/95 px-2 pb-[calc(0.55rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur">
+      <nav className="fixed bottom-0 left-0 right-0 z-20 border-t border-line bg-white/95 px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 backdrop-blur">
         <div className="mx-auto grid w-full max-w-md grid-cols-4 gap-1.5">
           {TABS.map((tab) => (
             <button
               key={tab.key}
               type="button"
               onClick={() => handleTabChange(tab.key)}
-              className={`flex min-h-[54px] items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[11px] font-semibold leading-none transition ${
+              className={`flex min-h-[56px] flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-2 text-[10px] font-semibold leading-tight transition ${
                 activeTab === tab.key
                   ? "bg-brand text-white shadow-sm"
                   : "bg-slate-100 text-slate-600"
               }`}
             >
               <TabPictogram tab={tab.key} />
-              <span>{tab.label}</span>
+              <span className="whitespace-nowrap">{tab.label}</span>
             </button>
           ))}
         </div>

@@ -1022,12 +1022,12 @@ export default function KakaoStoreSearchSection({
       <div className="relative">
         <div
           ref={mapRef}
-          className="h-[300px] w-full bg-slate-100 sm:h-[380px]"
+          className="h-[44vh] max-h-[520px] min-h-[300px] w-full bg-slate-100 sm:h-[380px]"
           style={{ minHeight: 300 }}
         />
       </div>
-      <div className="border-t border-line px-4 py-3">
-        <div className="flex items-center justify-between gap-3 text-xs text-slate-500">
+      <div className="border-t border-line px-3 py-2.5 sm:px-4 sm:py-3">
+        <div className="flex items-start justify-between gap-3 text-xs text-slate-500">
           <span className="leading-relaxed">
             {status === "searching"
               ? isUsingMyLocation
@@ -1043,7 +1043,7 @@ export default function KakaoStoreSearchSection({
             type="button"
             onClick={moveToMyLocation}
             aria-label="현재 위치로 이동"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm"
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm sm:h-9 sm:w-9"
           >
             <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" aria-hidden>
               <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.8" />
