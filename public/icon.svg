@@ -1,0 +1,4 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="BatteryFit icon">
+  <rect width="64" height="64" rx="14" fill="#f3f8f4"/>
+  <path d="M18 14h14c9 0 15 5 15 13 0 6-3 10-8 12 6 2 10 6 10 13 0 9-7 15-17 15H18V14zm12 20c5 0 8-2 8-6 0-4-3-6-8-6h-4v12h4zm2 22c6 0 9-2 9-7 0-5-3-7-9-7h-6v14h6z" fill="#12a150"/>
+</svg>
