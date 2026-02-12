@@ -1204,8 +1204,8 @@ export default function Home() {
   const totalLedgerCost = ledgerEntries.reduce((sum, entry) => sum + entry.amount, 0);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top,#dbeafe_0%,#f4f7fb_45%,#f4f7fb_100%)] px-3 py-4 text-slate-900 sm:px-6 sm:py-7 lg:px-10">
-      <main className="mx-auto flex w-full max-w-7xl flex-col gap-4 pb-[calc(6.5rem+env(safe-area-inset-bottom))] sm:gap-5">
+    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_top,#dbeafe_0%,#f4f7fb_45%,#f4f7fb_100%)] px-3 py-4 text-slate-900 sm:px-6 sm:py-7 lg:px-10">
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-4 pb-[calc(7rem+env(safe-area-inset-bottom))] sm:gap-5">
         {activeTab === "home" && (
           <section className="space-y-4">
             <header className="pt-1 text-center sm:pt-2">
