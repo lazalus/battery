@@ -33,7 +33,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
 
     const { id } = await params;
     const body = (await request.json()) as {
-      action?: "publish" | "reject" | "draft";
+      action?: "publish" | "draft";
     };
 
     if (!body.action) {
@@ -44,12 +44,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     }
 
     const now = new Date();
-    const nextStatus =
-      body.action === "publish"
-        ? "PUBLISHED"
-        : body.action === "reject"
-          ? "REJECTED"
-          : "DRAFT";
+    const nextStatus = body.action === "publish" ? "PUBLISHED" : "DRAFT";
 
     const updated = await prisma.batteryNotePost.update({
       where: { id },
@@ -78,6 +73,41 @@ export async function PATCH(request: Request, { params }: RouteContext) {
     return NextResponse.json(
       {
         message: "검수 상태 변경에 실패했습니다.",
+        detail: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(request: Request, { params }: RouteContext) {
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin) {
+      return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    await ensureBatteryNoteSchema();
+
+    const { id } = await params;
+    await prisma.batteryNotePost.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ deleted: true, id });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.toLowerCase().includes("record to delete does not exist")
+    ) {
+      return NextResponse.json(
+        { message: "이미 삭제되었거나 존재하지 않는 글입니다." },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        message: "글 삭제에 실패했습니다.",
         detail: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 },

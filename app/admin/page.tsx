@@ -130,7 +130,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleReview = async (id: string, action: "publish" | "reject" | "draft") => {
+  const handleReview = async (id: string, action: "publish" | "draft") => {
     setMessage("");
     try {
       const response = await fetch(`/api/admin/battery-notes/${id}`, {
@@ -145,6 +145,23 @@ export default function AdminPage() {
       await loadAdminNotes();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "검수 처리 오류");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    setMessage("");
+    try {
+      const response = await fetch(`/api/admin/battery-notes/${id}`, {
+        method: "DELETE",
+      });
+      const payload = (await response.json()) as { message?: string };
+      if (!response.ok) {
+        throw new Error(payload.message || "삭제에 실패했습니다.");
+      }
+      setMessage("글을 삭제했습니다.");
+      await loadAdminNotes();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "삭제 처리 오류");
     }
   };
 
@@ -191,7 +208,7 @@ export default function AdminPage() {
           </button>
           <h1 className="text-xl font-bold">관리자 배터리노트 검수</h1>
           <p className="mt-2 text-sm text-slate-600">
-            관리자 버튼으로 생성한 배터리 관련 초안을 확인하고 발행/반려를 처리합니다.
+            관리자 버튼으로 생성한 배터리 관련 초안을 확인하고 발행/삭제를 처리합니다.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <button
@@ -248,10 +265,10 @@ export default function AdminPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => void handleReview(note.id, "reject")}
+                    onClick={() => void handleDelete(note.id)}
                     className="rounded-lg bg-rose-600 px-2.5 py-1.5 text-[11px] font-semibold text-white"
                   >
-                    반려
+                    삭제
                   </button>
                   <button
                     type="button"
