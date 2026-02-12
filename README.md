@@ -1,36 +1,42 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Battery Wholesale Web App
 
-## Getting Started
+Next.js(App Router) 기반의 차량 배터리 검색/추천/장착점 지도 단일 페이지 앱입니다.
 
-First, run the development server:
+## 1) 설치 및 실행
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+브라우저에서 `http://localhost:3000` 접속
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 2) 환경 변수 설정
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`.env.local.example`를 복사해서 `.env.local`을 만들고 값을 채우세요.
 
-## Learn More
+```bash
+cp .env.local.example .env.local
+```
 
-To learn more about Next.js, take a look at the following resources:
+필수 값:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `NEXT_PUBLIC_KAKAO_MAP_APP_KEY`: 카카오 JavaScript 키
+- `TURSO_DATABASE_URL`: Turso DB URL (`libsql://...`)
+- `TURSO_AUTH_TOKEN`: Turso 인증 토큰
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 3) 핵심 파일
 
-## Deploy on Vercel
+- `app/page.tsx`: 단일 앱웹 화면 뼈대
+- `app/components/KakaoMapSection.tsx`: 카카오맵 로딩 및 마커 표시
+- `.env.local.example`: 환경 변수 템플릿
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 4) GitHub로 올리기
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+git add .
+git commit -m "feat: battery wholesale single-page skeleton with kakao map and turso env"
+git branch -M main
+git remote add origin https://github.com/<your-id>/<repo>.git
+git push -u origin main
+```
