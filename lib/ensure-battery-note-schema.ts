@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { runQuery } from "@/lib/db";
 
 let schemaEnsured = false;
 
@@ -7,7 +7,7 @@ export async function ensureBatteryNoteSchema() {
     return;
   }
 
-  await prisma.$executeRawUnsafe(`
+  await runQuery(`
     CREATE TABLE IF NOT EXISTS "BatteryNotePost" (
       "id" TEXT NOT NULL PRIMARY KEY,
       "slug" TEXT NOT NULL,
@@ -26,47 +26,54 @@ export async function ensureBatteryNoteSchema() {
     );
   `);
 
-  const columns = (await prisma.$queryRawUnsafe(`
+  const columnsResult = await runQuery(`
     PRAGMA table_info("BatteryNotePost");
-  `)) as Array<{ name: string }>;
-  const columnNames = new Set(columns.map((column) => column.name));
+  `);
+  const columnNames = new Set(
+    columnsResult.rows
+      .map((row) => {
+        const record = row as unknown as { name?: unknown };
+        return typeof record.name === "string" ? record.name : "";
+      })
+      .filter((name) => name.length > 0),
+  );
 
   if (!columnNames.has("status")) {
-    await prisma.$executeRawUnsafe(`
+    await runQuery(`
       ALTER TABLE "BatteryNotePost"
       ADD COLUMN "status" TEXT NOT NULL DEFAULT 'DRAFT';
     `);
   }
   if (!columnNames.has("reviewedAt")) {
-    await prisma.$executeRawUnsafe(`
+    await runQuery(`
       ALTER TABLE "BatteryNotePost"
       ADD COLUMN "reviewedAt" DATETIME;
     `);
   }
   if (!columnNames.has("reviewerId")) {
-    await prisma.$executeRawUnsafe(`
+    await runQuery(`
       ALTER TABLE "BatteryNotePost"
       ADD COLUMN "reviewerId" TEXT;
     `);
   }
 
-  await prisma.$executeRawUnsafe(`
+  await runQuery(`
     UPDATE "BatteryNotePost"
     SET "status" = 'PUBLISHED'
     WHERE "status" IS NULL OR "status" = '';
   `);
 
-  await prisma.$executeRawUnsafe(`
+  await runQuery(`
     CREATE UNIQUE INDEX IF NOT EXISTS "BatteryNotePost_slug_key"
     ON "BatteryNotePost"("slug");
   `);
 
-  await prisma.$executeRawUnsafe(`
+  await runQuery(`
     CREATE INDEX IF NOT EXISTS "BatteryNotePost_publishedAt_idx"
     ON "BatteryNotePost"("publishedAt");
   `);
 
-  await prisma.$executeRawUnsafe(`
+  await runQuery(`
     CREATE INDEX IF NOT EXISTS "BatteryNotePost_status_publishedAt_idx"
     ON "BatteryNotePost"("status", "publishedAt");
   `);

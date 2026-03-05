@@ -150,6 +150,7 @@ function toAbsoluteUrl(base: string, url: string) {
 function extractProductCode(...candidates: string[]) {
   const patterns = [
     /\b(AGM\s*\d{2,3}[A-Z]{0,2})\b/i,
+    /\b(DIN\s*\d{2,5}[A-Z]{0,3})\b/i,
     /\b(GB\s*\d{2,5}(?:-\d{2,3})?[A-Z]{0,3})\b/i,
     /\b(DF\s*\d{2,5}[A-Z]{0,3})\b/i,
     /\b(HK\s*\d{2,5}[A-Z]{0,3})\b/i,
@@ -166,6 +167,34 @@ function extractProductCode(...candidates: string[]) {
   }
 
   return undefined;
+}
+
+function extractCapacityAh(...candidates: string[]) {
+  for (const text of candidates) {
+    if (!text) {
+      continue;
+    }
+
+    const ahMatch = text.match(/(\d{2,3})\s*AH/i);
+    if (ahMatch) {
+      const parsed = Number(ahMatch[1]);
+      if (Number.isFinite(parsed) && parsed >= 30 && parsed <= 230) {
+        return parsed;
+      }
+    }
+
+    const codeMatch = normalizeCode(text).match(
+      /^(?:AGM|DIN|DF|GB|HK|MF)(\d{2,3})(?:[A-Z]|$)/,
+    );
+    if (codeMatch) {
+      const parsed = Number(codeMatch[1]);
+      if (Number.isFinite(parsed) && parsed >= 30 && parsed <= 230) {
+        return parsed;
+      }
+    }
+  }
+
+  return null;
 }
 
 function parseYearToken(token: string) {
@@ -745,8 +774,20 @@ function mapRocketCodeToDelkorCodes(code: string) {
     return [];
   }
 
+  const addOrientationVariants = (value: string) => {
+    candidates.add(value);
+    if (value.endsWith("R")) {
+      candidates.add(`${value.slice(0, -1)}L`);
+    }
+    if (value.endsWith("L")) {
+      candidates.add(`${value.slice(0, -1)}R`);
+    }
+  };
+
   if (normalized.startsWith("GB") && normalized.length > 2) {
-    candidates.add(`DF${normalized.slice(2)}`);
+    const suffix = normalized.slice(2);
+    addOrientationVariants(`DF${suffix}`);
+    addOrientationVariants(`DIN${suffix}`);
   }
 
   if (
@@ -754,10 +795,86 @@ function mapRocketCodeToDelkorCodes(code: string) {
     normalized.startsWith("DIN") ||
     normalized.startsWith("AGM")
   ) {
-    candidates.add(normalized);
+    addOrientationVariants(normalized);
+  }
+
+  if (normalized.startsWith("DF") && normalized.length > 2) {
+    addOrientationVariants(`DIN${normalized.slice(2)}`);
+  }
+
+  if (normalized.startsWith("DIN") && normalized.length > 3) {
+    addOrientationVariants(`DF${normalized.slice(3)}`);
   }
 
   return [...candidates];
+}
+
+function filterRocketItemsByDelkorReference(
+  rocketItems: CompatibleBatteryItem[],
+  delkorItems: CompatibleBatteryItem[],
+) {
+  if (rocketItems.length === 0 || delkorItems.length === 0) {
+    return rocketItems;
+  }
+
+  const delkorCodeSet = new Set(
+    delkorItems
+      .map((item) => item.productCode)
+      .filter((code): code is string => Boolean(code))
+      .flatMap((code) => {
+        const normalized = normalizeCode(code);
+        return mapRocketCodeToDelkorCodes(normalized).concat(normalized);
+      }),
+  );
+  const delkorAhSet = new Set(
+    delkorItems
+      .map((item) =>
+        extractCapacityAh(item.productCode ?? "", item.spec, item.name),
+      )
+      .filter((value): value is number => value !== null),
+  );
+
+  const byCodeOrAh = rocketItems.filter((item) => {
+    const normalizedCode = normalizeCode(item.productCode ?? "");
+    if (normalizedCode.length > 0) {
+      const mapped = mapRocketCodeToDelkorCodes(normalizedCode);
+      if (mapped.some((candidate) => delkorCodeSet.has(candidate))) {
+        return true;
+      }
+    }
+
+    const capacity = extractCapacityAh(item.productCode ?? "", item.spec, item.name);
+    return capacity !== null && delkorAhSet.has(capacity);
+  });
+
+  if (byCodeOrAh.length > 0) {
+    return dedupeItems(byCodeOrAh);
+  }
+
+  if (delkorAhSet.size === 0) {
+    return [];
+  }
+
+  const targetAhs = [...delkorAhSet];
+  const scored = rocketItems
+    .map((item) => {
+      const capacity = extractCapacityAh(item.productCode ?? "", item.spec, item.name);
+      if (capacity === null) {
+        return { item, gap: Number.POSITIVE_INFINITY };
+      }
+      const gap = Math.min(...targetAhs.map((target) => Math.abs(target - capacity)));
+      return { item, gap };
+    })
+    .sort((a, b) => a.gap - b.gap);
+
+  const bestGap = scored[0]?.gap ?? Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(bestGap)) {
+    return rocketItems;
+  }
+
+  const maxGap = Math.max(2, Math.min(5, bestGap));
+  const nearMatched = scored.filter((entry) => entry.gap <= maxGap).map((entry) => entry.item);
+  return nearMatched.length > 0 ? dedupeItems(nearMatched) : [];
 }
 
 async function fetchDelkorBatteriesByCodeFallback(rocketItems: CompatibleBatteryItem[]) {
@@ -975,9 +1092,13 @@ async function fetchAllSources(context: SearchContext) {
       ? await fetchDelkorBatteriesByCodeFallback(rocketItems).catch(() => [])
       : [];
   const mergedDelkorItems = delkorItems.length > 0 ? delkorItems : fallbackDelkorItems;
+  const matchedRocketItems = filterRocketItemsByDelkorReference(
+    rocketItems,
+    mergedDelkorItems,
+  );
 
   if (
-    rocketItems.length === 0 &&
+    matchedRocketItems.length === 0 &&
     hankookItems.length === 0 &&
     mergedDelkorItems.length === 0
   ) {
@@ -990,7 +1111,7 @@ async function fetchAllSources(context: SearchContext) {
     throw new Error(reason || "No battery data available");
   }
 
-  return dedupeItems([...rocketItems, ...mergedDelkorItems, ...hankookItems]);
+  return dedupeItems([...matchedRocketItems, ...mergedDelkorItems, ...hankookItems]);
 }
 
 export async function GET(request: Request) {

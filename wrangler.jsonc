@@ -5,10 +5,28 @@
   "compatibility_date": "2026-02-12",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "batteryfit.org",
+      "custom_domain": true
+    },
+    {
+      "pattern": "www.batteryfit.org",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "binding": "ASSETS",
     "directory": ".open-next/assets"
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "battery-db",
+      "database_id": "6c50474f-80b2-488a-b684-b756531a8a89",
+      "migrations_dir": "migrations"
+    }
+  ],
   "observability": {
     "enabled": true
   }

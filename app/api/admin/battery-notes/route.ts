@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { readSessionFromRequest } from "@/lib/auth";
 import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
 import { ensureBatteryNoteSchema } from "@/lib/ensure-battery-note-schema";
-import { safeStringArray } from "@/lib/battery-note";
 import { findUserById } from "@/lib/user-repository";
+import { listAdminBatteryNotes } from "@/lib/battery-note-repository";
 
 async function isAdmin(request: Request) {
   await ensureAuthSchema();
@@ -28,29 +27,7 @@ export async function GET(request: Request) {
 
     await ensureBatteryNoteSchema();
 
-    const posts = await prisma.batteryNotePost.findMany({
-      orderBy: [{ createdAt: "desc" }],
-      take: 60,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        excerpt: true,
-        status: true,
-        tags: true,
-        createdAt: true,
-        reviewedAt: true,
-        publishedAt: true,
-      },
-    });
-
-    const items = posts.map((post) => ({
-      ...post,
-      tags: safeStringArray(post.tags),
-      createdAt: post.createdAt.toISOString(),
-      reviewedAt: post.reviewedAt ? post.reviewedAt.toISOString() : null,
-      publishedAt: post.publishedAt.toISOString(),
-    }));
+    const items = await listAdminBatteryNotes(60);
 
     return NextResponse.json({ items });
   } catch (error) {

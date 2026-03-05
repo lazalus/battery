@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import {
   normalizeNoteImageUrl,
-  safeStringArray,
   type BatteryNotePreview,
 } from "@/lib/battery-note";
 import { ensureBatteryNoteSchema } from "@/lib/ensure-battery-note-schema";
+import { listPublishedBatteryNotes } from "@/lib/battery-note-repository";
 
 export async function GET(request: Request) {
   try {
@@ -17,20 +16,7 @@ export async function GET(request: Request) {
       ? Math.min(Math.max(rawLimit, 1), 30)
       : 10;
 
-    const posts = await prisma.batteryNotePost.findMany({
-      where: { status: "PUBLISHED" },
-      orderBy: { publishedAt: "desc" },
-      take: limit,
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        excerpt: true,
-        thumbnailUrl: true,
-        tags: true,
-        publishedAt: true,
-      },
-    });
+    const posts = await listPublishedBatteryNotes(limit);
 
     const items: BatteryNotePreview[] = posts.map((post) => ({
       id: post.id,
@@ -38,8 +24,8 @@ export async function GET(request: Request) {
       title: post.title,
       excerpt: post.excerpt,
       thumbnailUrl: normalizeNoteImageUrl(post.thumbnailUrl, 1, post.title),
-      tags: safeStringArray(post.tags),
-      publishedAt: post.publishedAt.toISOString(),
+      tags: post.tags,
+      publishedAt: post.publishedAt,
     }));
 
     return NextResponse.json({ items });

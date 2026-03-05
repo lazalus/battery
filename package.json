@@ -12,28 +12,24 @@
     "cf:preview": "opennextjs-cloudflare preview",
     "cf:typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
     "catalog:sync": "node scripts/fetch-rocket-catalog.mjs",
-    "db:generate": "prisma generate",
-    "db:push": "prisma db push",
-    "db:seed:catalog": "node scripts/sync-catalog-to-turso.mjs"
+    "db:migrate": "wrangler d1 migrations apply battery-db",
+    "db:migrate:local": "wrangler d1 migrations apply battery-db --local"
   },
   "dependencies": {
-    "@prisma/adapter-libsql": "^6.16.0",
-    "@prisma/client": "^6.16.0",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.9.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
-    "wrangler": "^4.44.0",
-    "@opennextjs/cloudflare": "^1.9.2",
-    "prisma": "^6.16.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "^4.44.0"
   }
 }

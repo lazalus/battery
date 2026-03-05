@@ -1,11 +1,10 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import {
   normalizeNoteImageUrl,
-  safeStringArray,
   type BatteryNoteDetail,
 } from "@/lib/battery-note";
 import { ensureBatteryNoteSchema } from "@/lib/ensure-battery-note-schema";
+import { findPublishedBatteryNoteBySlug } from "@/lib/battery-note-repository";
 
 type RouteContext = {
   params: Promise<{ slug: string }>;
@@ -16,20 +15,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
     await ensureBatteryNoteSchema();
 
     const { slug } = await params;
-    const post = await prisma.batteryNotePost.findFirst({
-      where: { slug, status: "PUBLISHED" },
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        excerpt: true,
-        content: true,
-        thumbnailUrl: true,
-        bodyImageUrls: true,
-        tags: true,
-        publishedAt: true,
-      },
-    });
+    const post = await findPublishedBatteryNoteBySlug(slug);
 
     if (!post) {
       return NextResponse.json(
@@ -45,11 +31,11 @@ export async function GET(_request: Request, { params }: RouteContext) {
       excerpt: post.excerpt,
       content: post.content,
       thumbnailUrl: normalizeNoteImageUrl(post.thumbnailUrl, 1, post.title),
-      bodyImageUrls: safeStringArray(post.bodyImageUrls).map((url, index) =>
+      bodyImageUrls: post.bodyImageUrls.map((url, index) =>
         normalizeNoteImageUrl(url, index + 2, `${post.title} ${index + 1}`),
       ),
-      tags: safeStringArray(post.tags),
-      publishedAt: post.publishedAt.toISOString(),
+      tags: post.tags,
+      publishedAt: post.publishedAt,
     };
 
     return NextResponse.json({ item });

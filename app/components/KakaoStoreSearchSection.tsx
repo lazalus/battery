@@ -19,6 +19,7 @@ type KakaoStoreSearchSectionProps = {
   keyword: string;
   region?: string;
   onResultsChange: (places: KakaoPlace[]) => void;
+  onMarkerClick?: (placeId: string) => void;
   nearbyOnly?: boolean;
   autoLocate?: boolean;
   forceNearbyBatteryQueries?: boolean;
@@ -58,6 +59,8 @@ type KakaoLatLngBounds = {
   extend: (latLng: unknown) => void;
 };
 
+type KakaoMarkerImage = unknown;
+
 type KakaoRuntime = {
   maps: {
     load: (callback: () => void) => void;
@@ -65,6 +68,9 @@ type KakaoRuntime = {
     LatLng: new (lat: number, lng: number) => unknown;
     LatLngBounds: new () => KakaoLatLngBounds;
     Marker: new (options: unknown) => KakaoMarkerInstance;
+    MarkerImage: new (src: string, size: unknown, options?: unknown) => KakaoMarkerImage;
+    Size: new (width: number, height: number) => unknown;
+    Point: new (x: number, y: number) => unknown;
     event?: {
       trigger: (target: unknown, type: string) => void;
       addListener?: (target: unknown, type: string, handler: () => void) => void;
@@ -267,6 +273,7 @@ export default function KakaoStoreSearchSection({
   keyword,
   region = "내주변",
   onResultsChange,
+  onMarkerClick,
   nearbyOnly = false,
   autoLocate = false,
   forceNearbyBatteryQueries = false,
@@ -284,6 +291,7 @@ export default function KakaoStoreSearchSection({
   );
   const [errorMessage, setErrorMessage] = useState("");
   const [locationMessage, setLocationMessage] = useState("");
+  const [isLocating, setIsLocating] = useState(false);
   const [searchCenter, setSearchCenter] = useState<{
     lat: number;
     lng: number;
@@ -340,6 +348,11 @@ export default function KakaoStoreSearchSection({
           position,
           title: place.place_name,
         });
+        if (kakao.maps.event?.addListener) {
+          kakao.maps.event.addListener(marker, "click", () => {
+            onMarkerClick?.(place.id);
+          });
+        }
         markersRef.current.push(marker);
         bounds.extend(position);
       }
@@ -354,7 +367,7 @@ export default function KakaoStoreSearchSection({
 
       onResultsChange(places);
     },
-    [clearMarkers, onResultsChange, relayoutMap, nearbyOnly],
+    [clearMarkers, onResultsChange, onMarkerClick, relayoutMap, nearbyOnly],
   );
 
   useEffect(() => {
@@ -576,6 +589,7 @@ export default function KakaoStoreSearchSection({
       return;
     }
 
+    setIsLocating(true);
     setLocationMessage("현재 위치를 확인하는 중입니다...");
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -583,6 +597,7 @@ export default function KakaoStoreSearchSection({
         const mapInstance = mapInstanceRef.current;
         if (!runtime?.maps || !mapInstance) {
           setLocationMessage("지도가 아직 준비되지 않았습니다.");
+          setIsLocating(false);
           return;
         }
 
@@ -595,10 +610,24 @@ export default function KakaoStoreSearchSection({
           myMarkerRef.current.setMap(null);
         }
 
+        // Blue pulsing dot SVG for "my location" marker
+        const myLocationSvg = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
+          `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 28 28">` +
+          `<circle cx="14" cy="14" r="13" fill="#3b82f6" fill-opacity="0.18" stroke="#3b82f6" stroke-width="1.5"/>` +
+          `<circle cx="14" cy="14" r="7" fill="#3b82f6" stroke="#fff" stroke-width="2.5"/>` +
+          `</svg>`
+        )}`;
+        const myLocationImage = new runtime.maps.MarkerImage(
+          myLocationSvg,
+          new runtime.maps.Size(28, 28),
+          { offset: new runtime.maps.Point(14, 14) },
+        );
+
         const marker = new runtime.maps.Marker({
           map: mapInstance,
           position: myPosition,
           title: "내 위치",
+          image: myLocationImage,
         });
         myMarkerRef.current = marker;
         suppressMapMovedRef.current = true;
@@ -648,8 +677,10 @@ export default function KakaoStoreSearchSection({
         setLocationMessage(
           "위치 확인 완료. 현재 위치 기준으로 주변 배터리 매장을 다시 검색합니다.",
         );
+        setIsLocating(false);
       },
       (error: GeolocationPositionError) => {
+        setIsLocating(false);
         if (error.code === error.PERMISSION_DENIED) {
           setLocationMessage(
             "위치 권한이 차단되어 있습니다. 브라우저 설정에서 위치를 허용해주세요.",
@@ -1003,7 +1034,7 @@ export default function KakaoStoreSearchSection({
 
   if (!appKey) {
     return (
-      <div className="rounded-xl border border-dashed border-red-300 bg-red-50 px-4 py-6 text-sm text-red-700">
+      <div className="rounded-xl border border-dashed border-red-500/30 bg-red-500/10 px-4 py-6 text-sm text-red-300">
         `NEXT_PUBLIC_KAKAO_MAP_APP_KEY` 값을 `.env.local`에 설정해주세요.
       </div>
     );
@@ -1011,55 +1042,61 @@ export default function KakaoStoreSearchSection({
 
   if (status === "error") {
     return (
-      <div className="rounded-xl border border-dashed border-red-300 bg-red-50 px-4 py-6 text-sm text-red-700">
+      <div className="rounded-xl border border-dashed border-red-500/30 bg-red-500/10 px-4 py-6 text-sm text-red-300">
         {errorMessage}
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-sm">
-      <div className="relative">
-        <div
-          ref={mapRef}
-          className="h-[44vh] max-h-[520px] min-h-[300px] w-full bg-slate-100 sm:h-[380px]"
-          style={{ minHeight: 300 }}
-        />
-      </div>
-      <div className="border-t border-line px-3 py-2.5 sm:px-4 sm:py-3">
-        <div className="flex items-start justify-between gap-3 text-xs text-slate-500">
-          <span className="leading-relaxed">
-            {status === "searching"
-              ? isUsingMyLocation
-                ? "현재 지도 중심 기준 주변 매장 검색 중..."
-                : "실매장 검색 중..."
-              : isUsingMyLocation
-                ? "현재 지도 중심 기준 주변 배터리 매장 결과입니다."
-                : nearbyOnly
-                  ? "위치 권한을 허용하면 현재 위치 주변 배터리 매장을 표시합니다."
-                  : "카카오 지도 기반 실매장 결과를 표시합니다."}
-          </span>
-          <button
-            type="button"
-            onClick={moveToMyLocation}
-            aria-label="현재 위치로 이동"
-            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm sm:h-9 sm:w-9"
-          >
-            <svg viewBox="0 0 24 24" className="h-4.5 w-4.5" fill="none" aria-hidden>
-              <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.8" />
-              <path
-                d="M12 3.5v3M12 17.5v3M20.5 12h-3M6.5 12h-3"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
+    <div className="relative h-[50vh] min-h-[320px] w-full sm:h-[460px] lg:h-full">
+      <div
+        ref={mapRef}
+        className="h-full w-full bg-[#1a1f2e]"
+        style={{ minHeight: 320 }}
+      />
+
+      {/* My location button - overlay on map */}
+      <button
+        type="button"
+        onClick={moveToMyLocation}
+        aria-label="현재 위치로 이동"
+        disabled={isLocating}
+        className={`absolute bottom-4 right-4 z-10 inline-flex h-10 items-center gap-2 rounded-full border px-3.5 text-xs font-semibold shadow-lg backdrop-blur-md transition ${
+          isLocating
+            ? "cursor-wait border-brand/40 bg-brand/20 text-brand"
+            : "border-white/20 bg-[#0a0e17]/80 text-white/80 hover:border-brand/50 hover:text-brand"
+        }`}
+      >
+        <svg
+          viewBox="0 0 24 24"
+          className={`h-4 w-4 ${isLocating ? "animate-spin" : ""}`}
+          fill="none"
+          aria-hidden
+        >
+          <circle cx="12" cy="12" r="3.5" stroke="currentColor" strokeWidth="1.9" />
+          <path
+            d="M12 3.5v3M12 17.5v3M20.5 12h-3M6.5 12h-3"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+          />
+        </svg>
+        <span>{isLocating ? "확인 중..." : "내 위치"}</span>
+      </button>
+
+      {/* Status badge - overlay on map */}
+      {(status === "searching" || locationMessage) && (
+        <div className="absolute bottom-4 left-4 z-10 max-w-[60%] rounded-lg border border-white/10 bg-[#0a0e17]/80 px-3 py-2 text-[11px] leading-4 text-white/60 shadow-lg backdrop-blur-md">
+          {status === "searching"
+            ? isUsingMyLocation
+              ? "주변 매장 검색 중..."
+              : "매장 검색 중..."
+            : nearbyOnly && locationMessage
+              ? locationMessage
+              : null}
         </div>
-        {nearbyOnly && locationMessage && (
-          <p className="mt-2 text-[11px] text-slate-600">{locationMessage}</p>
-        )}
-      </div>
+      )}
     </div>
   );
 }

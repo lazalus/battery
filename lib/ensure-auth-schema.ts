@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { runQuery } from "@/lib/db";
 
 let authSchemaEnsured = false;
 
@@ -7,7 +7,7 @@ export async function ensureAuthSchema() {
     return;
   }
 
-  await prisma.$executeRawUnsafe(`
+  await runQuery(`
     CREATE TABLE IF NOT EXISTS "AppUser" (
       "id" TEXT NOT NULL PRIMARY KEY,
       "email" TEXT NOT NULL,
@@ -19,12 +19,12 @@ export async function ensureAuthSchema() {
     );
   `);
 
-  await prisma.$executeRawUnsafe(`
+  await runQuery(`
     CREATE UNIQUE INDEX IF NOT EXISTS "AppUser_email_key"
     ON "AppUser"("email");
   `);
 
-  await prisma.$executeRawUnsafe(`
+  await runQuery(`
     CREATE INDEX IF NOT EXISTS "AppUser_role_idx"
     ON "AppUser"("role");
   `);

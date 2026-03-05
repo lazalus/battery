@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { readSessionFromRequest } from "@/lib/auth";
 import { ensureAuthSchema } from "@/lib/ensure-auth-schema";
 import { ensureBatteryNoteSchema } from "@/lib/ensure-battery-note-schema";
 import { findUserById } from "@/lib/user-repository";
+import {
+  deleteBatteryNoteById,
+  updateBatteryNoteStatus,
+} from "@/lib/battery-note-repository";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -43,32 +46,22 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       );
     }
 
-    const now = new Date();
     const nextStatus = body.action === "publish" ? "PUBLISHED" : "DRAFT";
 
-    const updated = await prisma.batteryNotePost.update({
-      where: { id },
-      data: {
-        status: nextStatus,
-        reviewedAt: now,
-        reviewerId: admin.id,
-        ...(nextStatus === "PUBLISHED" ? { publishedAt: now } : {}),
-      },
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        status: true,
-        reviewedAt: true,
-      },
+    const updated = await updateBatteryNoteStatus({
+      id,
+      status: nextStatus,
+      reviewerId: admin.id,
     });
 
-    return NextResponse.json({
-      item: {
-        ...updated,
-        reviewedAt: updated.reviewedAt?.toISOString() ?? null,
-      },
-    });
+    if (!updated) {
+      return NextResponse.json(
+        { message: "게시글을 찾을 수 없습니다." },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json({ item: updated });
   } catch (error) {
     return NextResponse.json(
       {
@@ -89,22 +82,17 @@ export async function DELETE(request: Request, { params }: RouteContext) {
     await ensureBatteryNoteSchema();
 
     const { id } = await params;
-    await prisma.batteryNotePost.delete({
-      where: { id },
-    });
+    const deleted = await deleteBatteryNoteById(id);
 
-    return NextResponse.json({ deleted: true, id });
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.toLowerCase().includes("record to delete does not exist")
-    ) {
+    if (!deleted) {
       return NextResponse.json(
         { message: "이미 삭제되었거나 존재하지 않는 글입니다." },
         { status: 404 },
       );
     }
 
+    return NextResponse.json({ deleted: true, id });
+  } catch (error) {
     return NextResponse.json(
       {
         message: "글 삭제에 실패했습니다.",

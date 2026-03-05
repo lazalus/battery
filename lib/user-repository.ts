@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { prisma } from "@/lib/prisma";
+import { firstRow, runQuery } from "@/lib/db";
 
 export type AppUserPublic = {
   id: string;
@@ -12,28 +12,11 @@ export type AppUserWithPassword = AppUserPublic & {
   passwordHash: string;
 };
 
-type AppUserDelegate = {
-  findUnique: (args: unknown) => Promise<unknown>;
-  create: (args: unknown) => Promise<unknown>;
-  count: (args?: unknown) => Promise<number>;
-};
-
-function getAppUserDelegate(): AppUserDelegate | null {
-  const maybe = (prisma as unknown as { appUser?: AppUserDelegate }).appUser;
-  if (!maybe) {
-    return null;
-  }
-  if (
-    typeof maybe.findUnique !== "function" ||
-    typeof maybe.create !== "function" ||
-    typeof maybe.count !== "function"
-  ) {
-    return null;
-  }
-  return maybe;
+function readString(value: unknown) {
+  return typeof value === "string" ? value : "";
 }
 
-function toNumber(value: unknown) {
+function readNumber(value: unknown) {
   if (typeof value === "number") {
     return value;
   }
@@ -42,70 +25,62 @@ function toNumber(value: unknown) {
   }
   if (typeof value === "string") {
     const parsed = Number(value);
-    if (Number.isFinite(parsed)) {
-      return parsed;
-    }
+    return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
 }
 
 export async function findUserByEmail(email: string) {
-  const delegate = getAppUserDelegate();
-  if (delegate) {
-    const result = (await delegate.findUnique({
-      where: { email },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-        passwordHash: true,
-      },
-    })) as AppUserWithPassword | null;
-    return result;
+  const result = await runQuery(
+    `SELECT id, name, email, role, passwordHash
+     FROM "AppUser"
+     WHERE email = ?
+     LIMIT 1`,
+    [email],
+  );
+  const row = firstRow(result);
+  if (!row) {
+    return null;
   }
 
-  const rows = (await prisma.$queryRawUnsafe(
-    `SELECT id, name, email, role, passwordHash FROM "AppUser" WHERE email = ? LIMIT 1`,
-    email,
-  )) as AppUserWithPassword[];
-  return rows[0] ?? null;
+  return {
+    id: readString(row.id),
+    name: readString(row.name),
+    email: readString(row.email),
+    role: readString(row.role),
+    passwordHash: readString(row.passwordHash),
+  } satisfies AppUserWithPassword;
 }
 
 export async function findUserById(id: string) {
-  const delegate = getAppUserDelegate();
-  if (delegate) {
-    const result = (await delegate.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-      },
-    })) as AppUserPublic | null;
-    return result;
+  const result = await runQuery(
+    `SELECT id, name, email, role
+     FROM "AppUser"
+     WHERE id = ?
+     LIMIT 1`,
+    [id],
+  );
+  const row = firstRow(result);
+  if (!row) {
+    return null;
   }
 
-  const rows = (await prisma.$queryRawUnsafe(
-    `SELECT id, name, email, role FROM "AppUser" WHERE id = ? LIMIT 1`,
-    id,
-  )) as AppUserPublic[];
-  return rows[0] ?? null;
+  return {
+    id: readString(row.id),
+    name: readString(row.name),
+    email: readString(row.email),
+    role: readString(row.role),
+  } satisfies AppUserPublic;
 }
 
 export async function countAdminUsers() {
-  const delegate = getAppUserDelegate();
-  if (delegate) {
-    return delegate.count({
-      where: { role: "ADMIN" },
-    });
-  }
-
-  const rows = (await prisma.$queryRawUnsafe(
-    `SELECT COUNT(*) as count FROM "AppUser" WHERE role = 'ADMIN'`,
-  )) as Array<{ count: unknown }>;
-  return toNumber(rows[0]?.count);
+  const result = await runQuery(
+    `SELECT COUNT(*) as count
+     FROM "AppUser"
+     WHERE role = 'ADMIN'`,
+  );
+  const row = firstRow(result);
+  return readNumber(row?.count);
 }
 
 export async function createUser(data: {
@@ -114,32 +89,13 @@ export async function createUser(data: {
   passwordHash: string;
   role: string;
 }) {
-  const delegate = getAppUserDelegate();
-  if (delegate) {
-    const result = (await delegate.create({
-      data,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        role: true,
-      },
-    })) as AppUserPublic;
-    return result;
-  }
-
   const id = randomUUID();
   const now = new Date().toISOString();
-  await prisma.$executeRawUnsafe(
+
+  await runQuery(
     `INSERT INTO "AppUser" (id, name, email, passwordHash, role, createdAt, updatedAt)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    id,
-    data.name,
-    data.email,
-    data.passwordHash,
-    data.role,
-    now,
-    now,
+    [id, data.name, data.email, data.passwordHash, data.role, now, now],
   );
 
   return {
