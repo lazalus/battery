@@ -48,12 +48,21 @@ export const metadata: Metadata = {
     title: "자동차 배터리 호환 찾기 - 내 차에 딱 맞는 배터리 | 배터리핏",
     description:
       "내 차 배터리 규격을 연식·엔진별로 확인하고, 호환 배터리 비교부터 주변 교체 매장 검색까지.",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "배터리핏 - 내차에 딱 맞는 배터리 찾기",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "자동차 배터리 호환 찾기 - 내 차에 딱 맞는 배터리 | 배터리핏",
     description:
       "내 차 배터리 규격을 연식·엔진별로 확인하고, 호환 배터리 비교부터 주변 교체 매장 검색까지.",
+    images: ["/og-image.png"],
   },
   robots: {
     index: true,

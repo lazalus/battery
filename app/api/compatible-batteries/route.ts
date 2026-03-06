@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import batterySpecsData from "@/data/battery-specs.json";
 
 type BatteryOrigin = "rocket" | "delkor" | "hankook";
 
@@ -18,6 +19,24 @@ type CacheEntry = {
   fetchedAt: number;
   items: CompatibleBatteryItem[];
 };
+
+type OemSpec = {
+  capacity: number;
+  polarity: "R" | "L" | null;
+  type: string;
+  confidence: string;
+  codes: string[];
+};
+
+type BatterySpecEntry = {
+  trimName: string;
+  brandName: string;
+  modelName: string;
+  oemSpec: OemSpec | null;
+  productCount: number;
+};
+
+const verifiedSpecs = (batterySpecsData as { specs: Record<string, BatterySpecEntry> }).specs;
 
 type HankookCodeRow = {
   code: string;
@@ -82,7 +101,7 @@ type SearchContext = {
 };
 
 const CACHE_TTL_MS = 1000 * 60 * 60 * 6;
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4";
 
 const ROCKET_BASE_URL = "https://rocketbattery.kr";
 const HANKOOK_BASE_URL = "https://www.hankook-battery.com";
@@ -183,13 +202,27 @@ function extractCapacityAh(...candidates: string[]) {
       }
     }
 
-    const codeMatch = normalizeCode(text).match(
-      /^(?:AGM|DIN|DF|GB|HK|MF)(\d{2,3})(?:[A-Z]|$)/,
+    const normalized = normalizeCode(text);
+
+    // Simple codes: GB80L, AGM70, DIN80R, etc.
+    const simpleMatch = normalized.match(
+      /^(?:AGM|EFB|DIN|DF|GB|HK|MF)(\d{2,3})(?:[RL])?$/,
     );
-    if (codeMatch) {
-      const parsed = Number(codeMatch[1]);
+    if (simpleMatch) {
+      const parsed = Number(simpleMatch[1]);
       if (Number.isFinite(parsed) && parsed >= 30 && parsed <= 230) {
         return parsed;
+      }
+    }
+
+    // DIN standard codes: GB56219, GB57820, etc.
+    // 5XXYY -> capacity = 5XX - 500,  6XXYY -> capacity = 6XX - 500
+    const dinMatch = normalized.match(/^(?:GB|DIN|DF)?([56]\d{4})$/);
+    if (dinMatch) {
+      const prefix3 = Number(dinMatch[1].slice(0, 3));
+      const capacity = prefix3 - 500;
+      if (Number.isFinite(capacity) && capacity >= 30 && capacity <= 230) {
+        return capacity;
       }
     }
   }
@@ -766,6 +799,23 @@ function formatDelkorCatalogSpec(row: DelkorCatalogProductRow) {
   return specs.join(" / ") || "델코 차량용";
 }
 
+function extractPolarity(...candidates: string[]): "R" | "L" | null {
+  for (const text of candidates) {
+    if (!text) {
+      continue;
+    }
+    const codeMatch = text.match(/\d\s*([RL])\s*$/i);
+    if (codeMatch) {
+      return codeMatch[1].toUpperCase() as "R" | "L";
+    }
+    const specMatch = text.match(/극성\s*(?:\d\s*\(?\s*)?([RL])\s*\)?/i);
+    if (specMatch) {
+      return specMatch[1].toUpperCase() as "R" | "L";
+    }
+  }
+  return null;
+}
+
 function mapRocketCodeToDelkorCodes(code: string) {
   const normalized = normalizeCode(code);
   const candidates = new Set<string>();
@@ -774,20 +824,10 @@ function mapRocketCodeToDelkorCodes(code: string) {
     return [];
   }
 
-  const addOrientationVariants = (value: string) => {
-    candidates.add(value);
-    if (value.endsWith("R")) {
-      candidates.add(`${value.slice(0, -1)}L`);
-    }
-    if (value.endsWith("L")) {
-      candidates.add(`${value.slice(0, -1)}R`);
-    }
-  };
-
   if (normalized.startsWith("GB") && normalized.length > 2) {
     const suffix = normalized.slice(2);
-    addOrientationVariants(`DF${suffix}`);
-    addOrientationVariants(`DIN${suffix}`);
+    candidates.add(`DF${suffix}`);
+    candidates.add(`DIN${suffix}`);
   }
 
   if (
@@ -795,15 +835,15 @@ function mapRocketCodeToDelkorCodes(code: string) {
     normalized.startsWith("DIN") ||
     normalized.startsWith("AGM")
   ) {
-    addOrientationVariants(normalized);
+    candidates.add(normalized);
   }
 
   if (normalized.startsWith("DF") && normalized.length > 2) {
-    addOrientationVariants(`DIN${normalized.slice(2)}`);
+    candidates.add(`DIN${normalized.slice(2)}`);
   }
 
   if (normalized.startsWith("DIN") && normalized.length > 3) {
-    addOrientationVariants(`DF${normalized.slice(3)}`);
+    candidates.add(`DF${normalized.slice(3)}`);
   }
 
   return [...candidates];
@@ -1061,6 +1101,65 @@ function dedupeItems(items: CompatibleBatteryItem[]) {
   return deduped;
 }
 
+function getVerifiedOemSpec(trimId: number): OemSpec | null {
+  const entry = verifiedSpecs[String(trimId)];
+  return entry?.oemSpec ?? null;
+}
+
+function filterByOemSpec(
+  items: CompatibleBatteryItem[],
+  oemSpec: OemSpec | null,
+) {
+  if (!oemSpec || items.length === 0) {
+    return items;
+  }
+
+  const { capacity: oemCapacity, polarity: oemPolarity, type: oemType } = oemSpec;
+
+  // Filter by capacity: allow exact match or within +5Ah tolerance (상향 호환)
+  const byCapacity = items.filter((item) => {
+    const ah = extractCapacityAh(item.productCode ?? "", item.spec, item.name);
+    if (ah === null) {
+      return true;
+    }
+    return ah >= oemCapacity && ah <= oemCapacity + 5;
+  });
+
+  const capacityFiltered = byCapacity.length > 0 ? byCapacity : items;
+
+  // Filter by type: AGM must match AGM, standard must match standard
+  const isAgm = oemType === "AGM";
+  const byType = capacityFiltered.filter((item) => {
+    const code = normalizeCode(item.productCode ?? "");
+    const specText = normalizeCode(item.spec);
+    const itemIsAgm =
+      code.startsWith("AGM") || specText.includes("AGM");
+    if (isAgm) {
+      return itemIsAgm;
+    }
+    return !itemIsAgm;
+  });
+
+  const typeFiltered = byType.length > 0 ? byType : capacityFiltered;
+
+  // Filter by polarity when known
+  if (oemPolarity) {
+    const byPolarity = typeFiltered.filter((item) => {
+      const polarity = extractPolarity(
+        item.productCode ?? "",
+        item.spec,
+        item.name,
+      );
+      return polarity === null || polarity === oemPolarity;
+    });
+    if (byPolarity.length > 0) {
+      return byPolarity;
+    }
+  }
+
+  return typeFiltered;
+}
+
 function buildCacheKey(context: SearchContext) {
   return [
     CACHE_VERSION,
@@ -1111,7 +1210,9 @@ async function fetchAllSources(context: SearchContext) {
     throw new Error(reason || "No battery data available");
   }
 
-  return dedupeItems([...matchedRocketItems, ...mergedDelkorItems, ...hankookItems]);
+  const allItems = dedupeItems([...matchedRocketItems, ...mergedDelkorItems, ...hankookItems]);
+  const oemSpec = getVerifiedOemSpec(context.trimId);
+  return filterByOemSpec(allItems, oemSpec);
 }
 
 export async function GET(request: Request) {
@@ -1138,10 +1239,13 @@ export async function GET(request: Request) {
   const cached = memoryCache.get(cacheKey);
   const now = Date.now();
 
+  const oemSpec = getVerifiedOemSpec(trimId);
+
   if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
     return NextResponse.json({
       trimId,
       context,
+      oemSpec,
       items: cached.items,
       cached: true,
     });
@@ -1158,6 +1262,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       trimId,
       context,
+      oemSpec,
       items,
       cached: false,
     });

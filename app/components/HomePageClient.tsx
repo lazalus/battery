@@ -141,9 +141,16 @@ function parseBatteryAh(battery: BatteryProduct) {
     if (Number.isFinite(ah) && ah >= 20 && ah <= 220) return ah;
   }
   const code = (battery.productCode ?? "").toUpperCase().replace(/\s+/g, "");
-  const fromCode = code.match(/^(?:AGM|DF|GB|HK|MF|DIN)(\d{2,3})(?:[A-Z]|$)/);
+  // Simple codes: GB80L, AGM70, DIN80R, etc.
+  const fromCode = code.match(/^(?:AGM|EFB|DF|GB|HK|MF|DIN)(\d{2,3})(?:[RL])?$/);
   if (fromCode) {
     const ah = Number(fromCode[1]);
+    if (Number.isFinite(ah) && ah >= 20 && ah <= 220) return ah;
+  }
+  // DIN standard codes: GB56219, GB57820, etc. (5XX - 500 = capacity)
+  const dinMatch = code.match(/^(?:GB|DIN|DF)?([56]\d{4})$/);
+  if (dinMatch) {
+    const ah = Number(dinMatch[1].slice(0, 3)) - 500;
     if (Number.isFinite(ah) && ah >= 20 && ah <= 220) return ah;
   }
   return undefined;
