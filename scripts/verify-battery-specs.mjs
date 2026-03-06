@@ -637,6 +637,46 @@ const OEM_REFERENCE = [
 // Match OEM reference by brand + trim name
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// DIN vs DF 규격 판별
+// - DIN: 유럽 표준. 저형(175~190mm), 매립 단자, 하단 브라켓 고정
+//   → 모든 AGM/EFB, 유럽차, ISG 탑재 최신 국산차
+// - DF: 한국/일본 표준. 고형(200~230mm), 돌출 단자, 상단 프레임 고정
+//   → 구형 국산차, 일본차 (standard 타입)
+// ---------------------------------------------------------------------------
+
+const DIN_BRANDS = new Set([
+  "BMW", "벤츠", "아우디", "폭스바겐", "볼보", "미니", "랜드로버", "재규어",
+  "푸조", "시트로엥", "피아트", "알파로메오", "마세라티", "포르쉐",
+]);
+
+function determineBatteryFormat(brandName, type, codes, oemFormat) {
+  // OEM 레퍼런스에서 명시적으로 지정한 경우 최우선
+  if (oemFormat) return oemFormat;
+
+  // AGM/EFB는 무조건 DIN 규격 (한국 시장 기준)
+  if (type === "AGM" || type === "EFB") return "DIN";
+
+  // 유럽 수입차는 standard여도 DIN
+  const normBrand = normalizeForMatch(brandName);
+  for (const dinBrand of DIN_BRANDS) {
+    if (normBrand.includes(normalizeForMatch(dinBrand))) return "DIN";
+  }
+
+  // 상품 코드에서 판별: DIN 5자리 코드 or DIN prefix → DIN
+  if (codes && codes.length > 0) {
+    for (const code of codes) {
+      const nc = normalizeCode(code);
+      if (nc.startsWith("DIN") || nc.startsWith("AGM") || nc.startsWith("EFB")) return "DIN";
+      // 5자리 DIN 표준 코드 (예: GB56219, GB57820)
+      if (/^(?:GB|DIN|DF)?[56]\d{4}$/.test(nc)) return "DIN";
+    }
+  }
+
+  // 나머지 standard → DF (한국 전통 규격)
+  return "DF";
+}
+
 function matchOemReference(brandName, trimName) {
   const normBrand = normalizeForMatch(brandName);
   const normTrim = normalizeForMatch(trimName);
@@ -759,24 +799,27 @@ async function main() {
 
       if ((capMatch && typeMatch) || (explicitAh && rocketSpec.capacity === explicitAh)) {
         confidence = "high";
+        const codes = rocketSpec.codes || [];
         finalSpec = {
           capacity: finalCap,
           polarity: oemRef.polarity || rocketSpec.polarity,
           type: finalType,
+          format: determineBatteryFormat(trim.brandName, finalType, codes, oemRef?.format),
           confidence,
-          codes: rocketSpec.codes || [],
+          codes,
         };
         source = "oemRef+rocket";
         stats.oemRefMatched++;
       } else {
-        // Conflict - use explicit Ah > OEM reference > Rocket
         confidence = "medium";
+        const codes = rocketSpec.codes || [];
         finalSpec = {
           capacity: finalCap,
           polarity: oemRef.polarity || rocketSpec.polarity,
           type: finalType,
+          format: determineBatteryFormat(trim.brandName, finalType, codes, oemRef?.format),
           confidence,
-          codes: rocketSpec.codes || [],
+          codes,
         };
         source = "oemRef(conflict)";
         stats.conflictResolved++;
@@ -789,20 +832,22 @@ async function main() {
         capacity: finalCap,
         polarity: oemRef.polarity,
         type: finalType,
+        format: determineBatteryFormat(trim.brandName, finalType, [], oemRef?.format),
         confidence,
         codes: [],
       };
       source = "oemRef";
       stats.oemRefMatched++;
     } else if (rocketSpec) {
-      // Only Rocket data - use explicit Ah if available, then Rocket
       const finalCap = explicitAh || rocketSpec.capacity;
       const finalType = isStopAndGo ? "AGM" : rocketSpec.type;
       const rocketConfidence = rocketSpec.confidence === "high" ? "medium" : "low";
+      const codes = rocketSpec.codes || [];
       finalSpec = {
         ...rocketSpec,
         capacity: finalCap,
         type: finalType,
+        format: determineBatteryFormat(trim.brandName, finalType, codes),
         confidence: rocketConfidence,
       };
       source = "rocket";
@@ -831,15 +876,23 @@ async function main() {
 
   // Confidence distribution
   const confDist = { high: 0, medium: 0, low: 0, none: 0 };
+  const fmtDist = { DIN: 0, DF: 0, none: 0 };
   Object.values(newSpecs).forEach(s => {
-    if (!s.oemSpec) confDist.none++;
-    else confDist[s.oemSpec.confidence]++;
+    if (!s.oemSpec) { confDist.none++; fmtDist.none++; }
+    else {
+      confDist[s.oemSpec.confidence]++;
+      fmtDist[s.oemSpec.format || "none"]++;
+    }
   });
   console.log("\n=== 신뢰도 분포 ===");
   console.log(`high: ${confDist.high}건`);
   console.log(`medium: ${confDist.medium}건`);
   console.log(`low: ${confDist.low}건`);
   console.log(`스펙없음: ${confDist.none}건`);
+  console.log("\n=== 규격(format) 분포 ===");
+  console.log(`DIN (유럽/저형): ${fmtDist.DIN}건`);
+  console.log(`DF (한국/고형): ${fmtDist.DF}건`);
+  console.log(`미정: ${fmtDist.none}건`);
 
   // Show some conflict examples
   console.log("\n=== 충돌 해결 샘플 (OEM vs Rocket) ===");

@@ -245,6 +245,7 @@ export default function HomePageClient() {
   const [trim, setTrim] = useState("");
   const [selectedBatteryId, setSelectedBatteryId] = useState("");
   const [compatibleBatteries, setCompatibleBatteries] = useState<BatteryProduct[]>([]);
+  const [oemFormat, setOemFormat] = useState<"DIN" | "DF" | "">("");
   const [isBatteryLoading, setIsBatteryLoading] = useState(false);
   const [batteryLoadError, setBatteryLoadError] = useState("");
   const batteryCacheRef = useRef<Record<string, BatteryProduct[]>>({});
@@ -319,6 +320,7 @@ export default function HomePageClient() {
   useEffect(() => {
     if (!selectedTrimId) {
       setCompatibleBatteries([]);
+      setOemFormat("");
       setIsBatteryLoading(false);
       setBatteryLoadError("");
       return;
@@ -347,11 +349,12 @@ export default function HomePageClient() {
         });
         const response = await fetch(`/api/compatible-batteries?${query.toString()}`);
         if (!response.ok) throw new Error(`API 요청 실패 (${response.status})`);
-        const payload = (await response.json()) as { items?: BatteryProduct[] };
+        const payload = (await response.json()) as { items?: BatteryProduct[]; oemSpec?: { format?: "DIN" | "DF" } };
         const items = Array.isArray(payload.items) ? payload.items : [];
         if (!cancelled) {
           batteryCacheRef.current[batteryCacheKey] = items;
           setCompatibleBatteries(items);
+          setOemFormat(payload.oemSpec?.format ?? "");
           setSelectedBatteryId((cur) => (items.some((i) => i.id === cur) ? cur : ""));
           // Scroll to results
           setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 150);
@@ -480,16 +483,6 @@ export default function HomePageClient() {
             />
           </div>
 
-          {/* Reset */}
-          {origin && (
-            <button
-              type="button"
-              onClick={handleReset}
-              className="mt-4 w-full rounded-xl border border-white/10 bg-white/5 py-2.5 text-xs font-medium text-white/50 transition hover:bg-white/10 hover:text-white/70"
-            >
-              초기화
-            </button>
-          )}
         </div>
 
         {/* Results */}
@@ -517,6 +510,18 @@ export default function HomePageClient() {
             {!isBatteryLoading && !batteryLoadError && compatibleBatteries.length === 0 && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-8 text-center text-sm text-white/40">
                 해당 트림에 매핑된 배터리 정보가 없습니다.
+              </div>
+            )}
+
+            {/* Format indicator */}
+            {!isBatteryLoading && compatibleBatteries.length > 0 && oemFormat && (
+              <div className="mb-3 flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${oemFormat === "DIN" ? "bg-violet-500/20 text-violet-300" : "bg-teal-500/20 text-teal-300"}`}>
+                  {oemFormat}
+                </span>
+                <span className="text-[11px] text-white/50">
+                  {oemFormat === "DIN" ? "유럽 규격 · 낮은 높이 · 매립 단자" : "국산 규격 · 높은 높이 · 돌출 단자"}
+                </span>
               </div>
             )}
 
@@ -606,6 +611,15 @@ export default function HomePageClient() {
                 )}
               </div>
             )}
+
+            {/* Reset */}
+            <button
+              type="button"
+              onClick={handleReset}
+              className="mt-4 w-full rounded-xl border border-white/10 bg-white/5 py-2.5 text-xs font-medium text-white/50 transition hover:bg-white/10 hover:text-white/70"
+            >
+              초기화
+            </button>
           </div>
         )}
       </main>

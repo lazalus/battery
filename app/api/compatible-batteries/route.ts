@@ -24,6 +24,7 @@ type OemSpec = {
   capacity: number;
   polarity: "R" | "L" | null;
   type: string;
+  format: "DIN" | "DF";
   confidence: string;
   codes: string[];
 };
@@ -824,10 +825,15 @@ function mapRocketCodeToDelkorCodes(code: string) {
     return [];
   }
 
+  // GB → 같은 규격 계열만 매핑 (DIN↔DF 교차 금지)
   if (normalized.startsWith("GB") && normalized.length > 2) {
     const suffix = normalized.slice(2);
-    candidates.add(`DF${suffix}`);
-    candidates.add(`DIN${suffix}`);
+    const format = detectCodeFormat(normalized);
+    if (format === "DIN") {
+      candidates.add(`DIN${suffix}`);
+    } else {
+      candidates.add(`DF${suffix}`);
+    }
   }
 
   if (
@@ -838,15 +844,38 @@ function mapRocketCodeToDelkorCodes(code: string) {
     candidates.add(normalized);
   }
 
-  if (normalized.startsWith("DF") && normalized.length > 2) {
-    candidates.add(`DIN${normalized.slice(2)}`);
-  }
-
-  if (normalized.startsWith("DIN") && normalized.length > 3) {
-    candidates.add(`DF${normalized.slice(3)}`);
-  }
+  // 같은 규격 내에서만 매핑
+  // DF ↔ DF, DIN ↔ DIN (교차 안 함)
 
   return [...candidates];
+}
+
+function detectCodeFormat(code: string): "DIN" | "DF" {
+  const normalized = normalizeCode(code);
+
+  // AGM/EFB → DIN
+  if (normalized.startsWith("AGM") || normalized.startsWith("EFB")) {
+    return "DIN";
+  }
+
+  // DIN prefix → DIN
+  if (normalized.startsWith("DIN")) {
+    return "DIN";
+  }
+
+  // DF prefix → DF
+  if (normalized.startsWith("DF")) {
+    return "DF";
+  }
+
+  // 5자리 DIN 표준 코드 (56219, 57820 등)
+  const stripped = normalized.replace(/^(?:GB|MF|HK)/, "");
+  if (/^[56]\d{4}$/.test(stripped)) {
+    return "DIN";
+  }
+
+  // 단순 코드 (GB80L, MF80R 등) → DF
+  return "DF";
 }
 
 function filterRocketItemsByDelkorReference(
@@ -1114,9 +1143,20 @@ function filterByOemSpec(
     return items;
   }
 
-  const { capacity: oemCapacity, polarity: oemPolarity, type: oemType } = oemSpec;
+  const { capacity: oemCapacity, polarity: oemPolarity, type: oemType, format: oemFormat } = oemSpec;
 
-  // Filter by capacity: allow exact match or within +5Ah tolerance (상향 호환)
+  // 1) Filter by format: DIN vs DF (물리적 호환성 - 최우선)
+  if (oemFormat) {
+    const byFormat = items.filter((item) => {
+      const itemFormat = detectCodeFormat(item.productCode ?? "");
+      return itemFormat === oemFormat;
+    });
+    if (byFormat.length > 0) {
+      items = byFormat;
+    }
+  }
+
+  // 2) Filter by capacity: allow exact match or within +5Ah tolerance (상향 호환)
   const byCapacity = items.filter((item) => {
     const ah = extractCapacityAh(item.productCode ?? "", item.spec, item.name);
     if (ah === null) {
@@ -1127,7 +1167,7 @@ function filterByOemSpec(
 
   const capacityFiltered = byCapacity.length > 0 ? byCapacity : items;
 
-  // Filter by type: AGM must match AGM, standard must match standard
+  // 3) Filter by type: AGM must match AGM, standard must match standard
   const isAgm = oemType === "AGM";
   const byType = capacityFiltered.filter((item) => {
     const code = normalizeCode(item.productCode ?? "");
@@ -1142,7 +1182,7 @@ function filterByOemSpec(
 
   const typeFiltered = byType.length > 0 ? byType : capacityFiltered;
 
-  // Filter by polarity when known
+  // 4) Filter by polarity when known
   if (oemPolarity) {
     const byPolarity = typeFiltered.filter((item) => {
       const polarity = extractPolarity(
