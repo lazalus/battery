@@ -4,9 +4,9 @@ import BatteryNoteListPageClient from "@/app/components/BatteryNoteListPageClien
 import { toAbsoluteUrl } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "배터리노트",
+  title: "자동차 배터리 교체 시기·관리법·종류 총정리 - 배터리노트",
   description:
-    "자동차 배터리 관리법, 교체 시기, AGM/EFB/일반배터리 차이, 차량 배터리 상식 등을 정리한 배터리핏 배터리노트",
+    "자동차 배터리 교체 시기 판단법, AGM·EFB·일반 배터리 차이, 올바른 관리법까지. 차량 배터리에 대해 알아야 할 모든 것을 배터리핏 배터리노트에서 확인하세요.",
   keywords: [
     "자동차 배터리 관리",
     "배터리 교체 시기",

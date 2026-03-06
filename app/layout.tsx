@@ -14,11 +14,11 @@ export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   applicationName: "배터리핏",
   title: {
-    default: "배터리핏 : 내차에 딱 맞는 배터리 찾기",
+    default: "자동차 배터리 호환 찾기 - 내 차에 딱 맞는 배터리 | 배터리핏",
     template: "%s | 배터리핏",
   },
   description:
-    "내 차에 맞는 자동차 배터리를 찾고, 주변 배터리 교체 매장까지 검색할 수 있는 차량 배터리 호환 조회 서비스 배터리핏",
+    "내 차 배터리 규격을 연식·엔진별로 확인하고, 호환 배터리 비교부터 주변 교체 매장 검색까지. 국산차·수입차 자동차 배터리 호환 조회 서비스 배터리핏",
   keywords: [
     "배터리핏",
     "자동차 배터리",
@@ -45,24 +45,15 @@ export const metadata: Metadata = {
     locale: "ko_KR",
     siteName: "배터리핏",
     url: "/",
-    title: "배터리핏 : 내차에 딱 맞는 배터리 찾기",
+    title: "자동차 배터리 호환 찾기 - 내 차에 딱 맞는 배터리 | 배터리핏",
     description:
-      "차량별 배터리 호환 모델을 찾고, 주변 매장까지 바로 연결되는 배터리 검색 서비스",
-    images: [
-      {
-        url: toAbsoluteUrl("/apple-icon.svg"),
-        width: 512,
-        height: 512,
-        alt: "배터리핏 로고",
-      },
-    ],
+      "내 차 배터리 규격을 연식·엔진별로 확인하고, 호환 배터리 비교부터 주변 교체 매장 검색까지.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "배터리핏 : 내차에 딱 맞는 배터리 찾기",
+    title: "자동차 배터리 호환 찾기 - 내 차에 딱 맞는 배터리 | 배터리핏",
     description:
-      "차량별 배터리 호환 모델과 주변 배터리 매장을 쉽고 빠르게 찾는 배터리핏",
-    images: [toAbsoluteUrl("/apple-icon.svg")],
+      "내 차 배터리 규격을 연식·엔진별로 확인하고, 호환 배터리 비교부터 주변 교체 매장 검색까지.",
   },
   robots: {
     index: true,

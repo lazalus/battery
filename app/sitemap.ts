@@ -26,6 +26,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.9,
     },
     {
+      url: toAbsoluteUrl("/battery-note"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    {
       url: toAbsoluteUrl("/about"),
       lastModified: now,
       changeFrequency: "monthly",

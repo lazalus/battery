@@ -1,4 +1,4 @@
-const DEFAULT_SITE_URL = "https://battery.nov9306-564.workers.dev";
+const DEFAULT_SITE_URL = "https://batteryfit.org";
 
 export function getSiteUrl() {
   const configured =

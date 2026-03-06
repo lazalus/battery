@@ -16,7 +16,6 @@ export const metadata: Metadata = {
     description:
       "차량별 배터리 호환 정보를 쉽게 확인하고 주변 매장까지 검색할 수 있는 배터리핏 서비스를 소개합니다.",
     url: "/about",
-    images: [toAbsoluteUrl("/apple-icon.svg")],
   },
 };
 

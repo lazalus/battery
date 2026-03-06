@@ -37,17 +37,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const { brand, model } = pair;
   const pagePath = getCarBatteryLandingPath(brand.id, model.id);
-  const title = `${brand.name} ${model.name} 배터리 호환 찾기`;
-  const description = `${brand.name} ${model.name} 차량의 배터리 호환 모델을 배터리핏에서 확인하고, 주변 매장 검색 및 쿠팡 상품구매까지 연결하세요.`;
+  const title = `${brand.name} ${model.name} 배터리 규격 호환표 - 교체 전 확인`;
+  const description = `${brand.name} ${model.name} 자동차 배터리 호환 규격을 연식·엔진별로 확인하세요. AGM/EFB/일반 배터리 비교, 주변 교체 매장 검색, 온라인 최저가 구매까지 배터리핏에서 한번에.`;
 
   return {
     title,
     description,
     keywords: [
       `${brand.name} ${model.name} 배터리`,
-      `${model.name} 배터리`,
-      `${brand.name} 배터리 교체`,
-      "차량모델 배터리",
+      `${model.name} 배터리 규격`,
+      `${model.name} 배터리 교체`,
+      `${brand.name} 배터리 호환`,
+      "자동차 배터리 호환표",
       "배터리핏",
     ],
     alternates: { canonical: pagePath },
@@ -57,13 +58,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title,
       description,
       url: pagePath,
-      images: [toAbsoluteUrl("/apple-icon.svg")],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [toAbsoluteUrl("/apple-icon.svg")],
     },
   };
 }

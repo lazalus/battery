@@ -35,17 +35,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const pagePath = getBrandBatterySlugPath(brand);
-  const title = `${brand.name} 배터리 | 모델별 차량 배터리 찾기`;
-  const description = `${brand.name} 차량의 모델별 배터리 찾기 페이지입니다. 모델 선택 후 배터리핏에서 호환 배터리, 주변 매장, 상품구매 정보를 확인하세요.`;
+  const title = `${brand.name} 자동차 배터리 모델별 호환 찾기`;
+  const description = `${brand.name} 차량 모델별 배터리 규격·호환표를 한눈에 확인하세요. 연식·엔진별 호환 배터리 조회, 주변 매장 검색, 온라인 구매까지 배터리핏에서.`;
 
   return {
     title,
     description,
     keywords: [
       `${brand.name} 배터리`,
-      `${brand.name} 차량 배터리`,
+      `${brand.name} 자동차 배터리`,
       `${brand.name} 배터리 교체`,
-      `${brand.name} 모델별 배터리`,
+      `${brand.name} 배터리 규격`,
+      "자동차 배터리 호환",
       "배터리핏",
     ],
     alternates: { canonical: pagePath },
@@ -55,13 +56,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       title,
       description,
       url: pagePath,
-      images: [toAbsoluteUrl("/apple-icon.svg")],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [toAbsoluteUrl("/apple-icon.svg")],
     },
   };
 }

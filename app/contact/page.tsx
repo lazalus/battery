@@ -16,7 +16,6 @@ export const metadata: Metadata = {
     description:
       "배터리핏 서비스 오류, 배터리 데이터 수정, 제휴/광고 문의를 안내합니다.",
     url: "/contact",
-    images: [toAbsoluteUrl("/apple-icon.svg")],
   },
 };
 

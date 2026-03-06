@@ -24,18 +24,41 @@ type CatalogBrand = (typeof vehicleCatalog.brands)[number];
 type CatalogModel = CatalogBrand["models"][number];
 type CatalogTrim = CatalogModel["trims"][number];
 
+type FuelType = "가솔린" | "디젤" | "LPG" | "하이브리드" | "전기" | "기타";
+
 type ParsedTrim = {
   id: string;
   fullName: string;
   yearLabel: string;
   engineLabel: string;
+  fuelType: FuelType;
+  startYear: number;
 };
 
 type BatteryBadge = {
-  label: "권장" | "상향 가능";
+  label: "정규격" | "여유 용량" | "타입 확인";
   badgeClassName: string;
   detail: string;
 };
+
+function detectFuelType(label: string): FuelType {
+  const text = label.toUpperCase().replace(/\s+/g, "");
+  if (text.includes("하이브리드") || text.includes("HYBRID") || text.includes("HEV")) return "하이브리드";
+  if (text.includes("전기") || text.includes("EV")) return "전기";
+  if (text.includes("디젤") || text.includes("DIESEL")) return "디젤";
+  if (text.includes("LPG") || text.includes("엘피지")) return "LPG";
+  if (text.includes("가솔린") || text.includes("터보") || text.includes("GDI") || text.includes("휘발유")) return "가솔린";
+  return "기타";
+}
+
+function parseStartYear(yearLabel: string): number {
+  const match = yearLabel.match(/(\d{2,4})/);
+  if (!match) return 9999;
+  const num = Number(match[1]);
+  if (num >= 80 && num <= 99) return 1900 + num;
+  if (num >= 0 && num <= 50) return 2000 + num;
+  return num;
+}
 
 function parseTrim(trim: CatalogTrim): ParsedTrim {
   const raw = trim.name.trim();
@@ -44,7 +67,14 @@ function parseTrim(trim: CatalogTrim): ParsedTrim {
   const engineLabel = yearMatch
     ? raw.replace(/\s*\([^)]+\)\s*$/, "").trim()
     : raw;
-  return { id: String(trim.id), fullName: raw, yearLabel, engineLabel };
+  return {
+    id: String(trim.id),
+    fullName: raw,
+    yearLabel,
+    engineLabel,
+    fuelType: detectFuelType(engineLabel),
+    startYear: parseStartYear(yearLabel),
+  };
 }
 
 const CATALOG_BRANDS = vehicleCatalog.brands as CatalogBrand[];
@@ -120,39 +150,43 @@ function parseBatteryAh(battery: BatteryProduct) {
 }
 
 function getBatteryBadge(battery: BatteryProduct, primaryBattery?: BatteryProduct): BatteryBadge {
-  const recommended: BatteryBadge = {
-    label: "권장",
+  const exact: BatteryBadge = {
+    label: "정규격",
     badgeClassName: "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30",
-    detail: "차량 기준 권장 범위",
+    detail: "차량 기준 정규격",
   };
-  if (!primaryBattery || battery.id === primaryBattery.id) return recommended;
+  if (!primaryBattery || battery.id === primaryBattery.id) return exact;
 
   const primaryType = detectBatteryType(primaryBattery);
   const currentType = detectBatteryType(battery);
   if (primaryType !== "UNKNOWN" && currentType !== "UNKNOWN" && primaryType !== currentType) {
     return {
-      label: "상향 가능",
+      label: "타입 확인",
       badgeClassName: "bg-amber-500/20 text-amber-300 border border-amber-500/30",
-      detail: `타입 확인 필요 (${currentType})`,
+      detail: `배터리 타입이 다릅니다 (${currentType})`,
     };
   }
 
   const primaryAh = parseBatteryAh(primaryBattery);
   const currentAh = parseBatteryAh(battery);
   if (primaryAh && currentAh) {
-    if (currentAh > primaryAh * 1.25 || currentAh < primaryAh * 0.85) {
-      return { label: "상향 가능", badgeClassName: "bg-amber-500/20 text-amber-300 border border-amber-500/30", detail: `용량 확인 필요 (${currentAh}Ah)` };
+    const diff = currentAh - primaryAh;
+    if (currentAh < primaryAh * 0.85) {
+      return { label: "타입 확인", badgeClassName: "bg-amber-500/20 text-amber-300 border border-amber-500/30", detail: `용량 부족 주의 (${currentAh}Ah)` };
     }
-    if (currentAh > primaryAh * 1.1) {
-      return { label: "상향 가능", badgeClassName: "bg-amber-500/20 text-amber-300 border border-amber-500/30", detail: `${primaryAh}Ah 대비 상향` };
+    if (currentAh > primaryAh * 1.25) {
+      return { label: "여유 용량", badgeClassName: "bg-sky-500/20 text-sky-300 border border-sky-500/30", detail: `+${diff}Ah 대용량 (장착 확인 필요)` };
     }
-    return { ...recommended, detail: `${currentAh}Ah 기준` };
+    if (diff > 0) {
+      return { label: "여유 용량", badgeClassName: "bg-sky-500/20 text-sky-300 border border-sky-500/30", detail: `+${diff}Ah 여유 · 배터리 수명에 유리` };
+    }
+    return { ...exact, detail: `${currentAh}Ah 정규격` };
   }
 
   if ((battery.note ?? "").includes("보강")) {
-    return { label: "상향 가능", badgeClassName: "bg-amber-500/20 text-amber-300 border border-amber-500/30", detail: "코드 기준 대체 후보" };
+    return { label: "여유 용량", badgeClassName: "bg-sky-500/20 text-sky-300 border border-sky-500/30", detail: "코드 기준 호환 대체" };
   }
-  return recommended;
+  return exact;
 }
 
 const WIZARD_STORAGE_KEY = "battery-wizard-state-v2";
@@ -257,8 +291,17 @@ export default function HomePageClient() {
   const modelOptions = selectedBrand?.models ?? [];
   const selectedModel = modelOptions.find((item) => item.name === model);
   const parsedTrims = (selectedModel?.trims ?? []).map(parseTrim);
-  const yearOptions = [...new Set(parsedTrims.map((item) => item.yearLabel))];
-  const trimOptions = parsedTrims.filter((item) => year.length === 0 || item.yearLabel === year);
+  const yearOptions = [...new Set(parsedTrims.map((item) => item.yearLabel))]
+    .map((label) => ({ label, startYear: parseStartYear(label) }))
+    .sort((a, b) => b.startYear - a.startYear)
+    .map((item) => item.label);
+  const trimOptions = parsedTrims
+    .filter((item) => year.length === 0 || item.yearLabel === year)
+    .sort((a, b) => {
+      const fuelOrder: FuelType[] = ["가솔린", "디젤", "LPG", "하이브리드", "전기", "기타"];
+      const diff = fuelOrder.indexOf(a.fuelType) - fuelOrder.indexOf(b.fuelType);
+      return diff !== 0 ? diff : a.engineLabel.localeCompare(b.engineLabel, "ko");
+    });
   const selectedTrim = parsedTrims.find((item) => item.id === trim);
   const selectedTrimId = selectedTrim?.id ?? "";
   const selectedEngineLabel = selectedTrim?.engineLabel ?? "";
@@ -423,7 +466,10 @@ export default function HomePageClient() {
               value={trim}
               onChange={handleTrimChange}
               disabled={!year}
-              options={trimOptions.map((t) => ({ value: t.id, label: t.engineLabel }))}
+              options={trimOptions.map((t) => {
+                const tag = t.fuelType !== "기타" ? `[${t.fuelType}] ` : "";
+                return { value: t.id, label: `${tag}${t.engineLabel}` };
+              })}
             />
           </div>
 
@@ -506,6 +552,14 @@ export default function HomePageClient() {
                   );
                 })}
               </div>
+            )}
+
+            {/* Upgrade tip */}
+            {!isBatteryLoading && compatibleBatteries.length > 1 && (
+              <p className="mt-3 rounded-lg border border-sky-500/10 bg-sky-500/5 px-3 py-2 text-[11px] leading-4 text-sky-300/70">
+                <span className="font-semibold text-sky-300">TIP</span>{" "}
+                동일 규격에서 10Ah 정도 용량이 높은 배터리는 전장 부하에 여유가 생겨 배터리 수명과 시동 안정성에 유리합니다.
+              </p>
             )}
 
             {/* Action buttons */}
